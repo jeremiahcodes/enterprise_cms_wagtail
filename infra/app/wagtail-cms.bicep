@@ -84,7 +84,7 @@ resource webApp 'Microsoft.Web/sites@2022-03-01' = {
   properties: {
     serverFarmId: appServicePlan.id
     siteConfig: {
-      linuxFxVersion: 'DOCKER|mcr.microsoft.com/azuredocs/aci-helloworld:latest'
+      linuxFxVersion: 'DOCKER|${containerRegistry.properties.loginServer}/wagtail-cms:latest'
       alwaysOn: false  // Set to false for free tier
       appSettings: [
         {
