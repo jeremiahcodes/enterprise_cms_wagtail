@@ -11,8 +11,10 @@ EXPOSE 8000
 # 1. Force Python stdout and stderr streams to be unbuffered.
 # 2. Set PORT variable that is used by Gunicorn. This should match "EXPOSE"
 #    command.
+# 3. Set Django settings module to production
 ENV PYTHONUNBUFFERED=1 \
-    PORT=8000
+    PORT=8000 \
+    DJANGO_SETTINGS_MODULE=cms.settings.production
 
 # Install system packages required by Wagtail and Django.
 RUN apt-get update --yes --quiet && apt-get install --yes --quiet --no-install-recommends \
@@ -22,7 +24,7 @@ RUN apt-get update --yes --quiet && apt-get install --yes --quiet --no-install-r
     libjpeg62-turbo-dev \
     zlib1g-dev \
     libwebp-dev \
- && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/*
 
 # Install the application server.
 RUN pip install "gunicorn==20.0.4"
