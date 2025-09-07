@@ -6,11 +6,11 @@ param allowBlobPublicAccess bool = false
 param containers array = [
   {
     name: 'static'
-    publicAccess: 'Blob'
+    publicAccess: 'None'
   }
   {
     name: 'media'
-    publicAccess: 'Blob'
+    publicAccess: 'None'
   }
 ]
 param kind string = 'StorageV2'
@@ -26,6 +26,7 @@ resource storage 'Microsoft.Storage/storageAccounts@2022-05-01' = {
   properties: {
     minimumTlsVersion: minimumTlsVersion
     allowBlobPublicAccess: allowBlobPublicAccess
+    allowSharedKeyAccess: true
     networkAcls: {
       bypass: 'AzureServices'
       defaultAction: 'Allow'

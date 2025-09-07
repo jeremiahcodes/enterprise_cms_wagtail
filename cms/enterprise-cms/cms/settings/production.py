@@ -35,7 +35,12 @@ if AZURE_ACCOUNT_NAME and AZURE_ACCOUNT_KEY:
             },
         },
         "staticfiles": {
-            "BACKEND": "django.contrib.staticfiles.storage.ManifestStaticFilesStorage",
+            "BACKEND": "storages.backends.azure_storage.AzureStorage",
+            "OPTIONS": {
+                "azure_container": "static",
+                "account_name": AZURE_ACCOUNT_NAME,
+                "account_key": AZURE_ACCOUNT_KEY,
+            },
         },
     }
     
