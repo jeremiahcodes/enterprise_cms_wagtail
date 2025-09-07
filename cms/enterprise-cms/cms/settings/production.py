@@ -71,12 +71,18 @@ if AZURE_ACCOUNT_NAME and AZURE_ACCOUNT_KEY:
             "azure_container": "media",
             "account_name": AZURE_ACCOUNT_NAME,
             "account_key": AZURE_ACCOUNT_KEY,
+            "overwrite_files": True,
+            "azure_ssl": True,
         },
     }
     
-    # Media files configuration with Azure Blob Storage
+    # Media files configuration with Azure Blob Storage (private)
     AZURE_MEDIA_CONTAINER = 'media'
-    MEDIA_URL = f'https://{AZURE_ACCOUNT_NAME}.blob.core.windows.net/{AZURE_MEDIA_CONTAINER}/'
+    # Serve media files through Django instead of direct Azure URLs
+    MEDIA_URL = '/media/'
+    
+    # Custom storage class for private Azure media files
+    DEFAULT_FILE_STORAGE = 'storages.backends.azure_storage.AzureStorage'
 else:
     # Fallback to local storage for media files too
     STORAGES["default"] = {
