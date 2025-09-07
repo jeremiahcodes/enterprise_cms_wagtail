@@ -4,6 +4,19 @@ from .base import *
 
 DEBUG = False
 
+# Add WhiteNoise middleware for static files
+MIDDLEWARE = [
+    "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",  # Add this after SecurityMiddleware
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "wagtail.contrib.redirects.middleware.RedirectMiddleware",
+]
+
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-change-me')
 
@@ -33,44 +46,38 @@ else:
 AZURE_ACCOUNT_NAME = os.environ.get('AZURE_STORAGE_ACCOUNT_NAME')
 AZURE_ACCOUNT_KEY = os.environ.get('AZURE_STORAGE_ACCOUNT_KEY')
 
+# Serve static files from container, media files from Azure Storage
+STORAGES = {
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
+
+# Static files served from container using WhiteNoise
+STATIC_URL = '/static/'
+STATIC_ROOT = '/app/staticfiles'
+
 if AZURE_ACCOUNT_NAME and AZURE_ACCOUNT_KEY:
-    # Use Azure Blob Storage for media files
-    STORAGES = {
-        "default": {
-            "BACKEND": "storages.backends.azure_storage.AzureStorage",
-            "OPTIONS": {
-                "azure_container": "media",
-                "account_name": AZURE_ACCOUNT_NAME,
-                "account_key": AZURE_ACCOUNT_KEY,
-            },
-        },
-        "staticfiles": {
-            "BACKEND": "storages.backends.azure_storage.AzureStorage",
-            "OPTIONS": {
-                "azure_container": "static",
-                "account_name": AZURE_ACCOUNT_NAME,
-                "account_key": AZURE_ACCOUNT_KEY,
-            },
+    # Use Azure Blob Storage for media files only
+    STORAGES["default"] = {
+        "BACKEND": "storages.backends.azure_storage.AzureStorage",
+        "OPTIONS": {
+            "azure_container": "media",
+            "account_name": AZURE_ACCOUNT_NAME,
+            "account_key": AZURE_ACCOUNT_KEY,
         },
     }
-    
-    # Static files configuration with Azure Blob Storage
-    AZURE_STATIC_CONTAINER = 'static'
-    STATIC_URL = f'https://{AZURE_ACCOUNT_NAME}.blob.core.windows.net/{AZURE_STATIC_CONTAINER}/'
     
     # Media files configuration with Azure Blob Storage
     AZURE_MEDIA_CONTAINER = 'media'
     MEDIA_URL = f'https://{AZURE_ACCOUNT_NAME}.blob.core.windows.net/{AZURE_MEDIA_CONTAINER}/'
 else:
-    # Fallback to local storage
-    STORAGES = {
-        "default": {
-            "BACKEND": "django.core.files.storage.FileSystemStorage",
-        },
-        "staticfiles": {
-            "BACKEND": "django.contrib.staticfiles.storage.ManifestStaticFilesStorage",
-        },
+    # Fallback to local storage for media files too
+    STORAGES["default"] = {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
     }
+    MEDIA_URL = '/media/'
+    MEDIA_ROOT = '/app/media'
 
 # Security settings for production
 SECURE_BROWSER_XSS_FILTER = True
