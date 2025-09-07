@@ -23,6 +23,12 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-change-me')
 # SECURITY WARNING: define the correct hosts in production!
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*').split(',')
 
+# CSRF trusted origins for Azure App Service
+CSRF_TRUSTED_ORIGINS = [
+    'https://appwagtail-eku4qbynnabok.azurewebsites.net',
+    'https://*.azurewebsites.net',
+]
+
 # Database configuration for PostgreSQL
 DATABASE_URL = os.environ.get('DATABASE_URL')
 if DATABASE_URL:
@@ -88,8 +94,8 @@ SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 SECURE_HSTS_PRELOAD = True
 
 # Session security
-SESSION_COOKIE_SECURE = True
-CSRF_COOKIE_SECURE = True
+SESSION_COOKIE_SECURE = False  # Set to False for Azure App Service testing
+CSRF_COOKIE_SECURE = False     # Set to False for Azure App Service testing
 
 # Logging configuration
 LOGGING = {

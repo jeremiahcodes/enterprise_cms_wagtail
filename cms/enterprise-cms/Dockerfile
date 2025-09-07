@@ -50,4 +50,12 @@ USER wagtail
 # Collect static files.
 RUN python manage.py collectstatic --noinput --clear
 
+# --- BEGIN: One-time superuser creation ---
+ENV DJANGO_SUPERUSER_USERNAME=jcodes
+ENV DJANGO_SUPERUSER_EMAIL=jcodes@gmail.com
+ENV DJANGO_SUPERUSER_PASSWORD=yourpassword123
+RUN python manage.py migrate --noinput
+RUN python manage.py createinitialsuperuser
+# --- END: One-time superuser creation ---
+
 CMD set -xe; python manage.py migrate --noinput; gunicorn cms.wsgi:application --bind 0.0.0.0:8000
