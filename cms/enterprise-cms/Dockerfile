@@ -47,15 +47,17 @@ COPY --chown=wagtail:wagtail . .
 # Use user "wagtail" to run the build commands below and the server itself.
 USER wagtail
 
-# Collect static files.
+# Static files collection
 RUN python manage.py collectstatic --noinput --clear
 
-# --- BEGIN: One-time superuser creation ---
-ENV DJANGO_SUPERUSER_USERNAME=jcodes
-ENV DJANGO_SUPERUSER_EMAIL=jcodes@gmail.com
+# Create startup script that will run migrations and superuser creation at startup
+RUN echo '#!/bin/bash\npython manage.py migrate --noinput\npython manage.py createinitialsuperuser\nexec "$@"' > /app/startup.sh && chmod +x /app/startup.sh
+
+# --- START: One-time superuser creation ---
+# Environment variables for superuser creation
+ENV DJANGO_SUPERUSER_USERNAME=admin
+ENV DJANGO_SUPERUSER_EMAIL=admin@example.com
 ENV DJANGO_SUPERUSER_PASSWORD=yourpassword123
-RUN python manage.py migrate --noinput
-RUN python manage.py createinitialsuperuser
 # --- END: One-time superuser creation ---
 
-CMD set -xe; python manage.py migrate --noinput; gunicorn cms.wsgi:application --bind 0.0.0.0:8000
+CMD ["/app/startup.sh", "gunicorn", "cms.wsgi:application", "--bind", "0.0.0.0:8000"]
