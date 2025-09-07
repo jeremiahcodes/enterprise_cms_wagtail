@@ -28,17 +28,6 @@ resource rg 'Microsoft.Resources/resourceGroups@2022-09-01' = {
   tags: tags
 }
 
-module containerAppsEnvironment './core/host/container-apps-environment.bicep' = {
-  name: 'container-apps-environment'
-  scope: rg
-  params: {
-    name: '${abbrs.appManagedEnvironments}${resourceToken}'
-    location: location
-    tags: tags
-    logAnalyticsWorkspaceName: monitoring.outputs.logAnalyticsWorkspaceName
-  }
-}
-
 module containerRegistry './core/host/container-registry.bicep' = {
   name: 'container-registry'
   scope: rg
@@ -93,15 +82,29 @@ module storage './core/storage/storage-account.bicep' = {
   }
 }
 
+module appServicePlan './core/host/appserviceplan.bicep' = {
+  name: 'appservice-plan'
+  scope: rg
+  params: {
+    name: '${abbrs.webServerFarms}${resourceToken}'
+    location: location
+    tags: tags
+    sku: {
+      name: 'F1'  // Free tier
+      tier: 'Free'
+    }
+  }
+}
+
 module wagtailCms './app/wagtail-cms.bicep' = {
   name: 'wagtail-cms'
   scope: rg
   params: {
-    name: '${abbrs.appContainerApps}wagtail-${resourceToken}'
+    name: '${abbrs.webSites}wagtail-${resourceToken}'
     location: location
     tags: tags
     identityName: '${abbrs.managedIdentityUserAssignedIdentities}wagtail-${resourceToken}'
-    containerAppsEnvironmentName: containerAppsEnvironment.outputs.name
+    appServicePlanName: appServicePlan.outputs.name
     containerRegistryName: containerRegistry.outputs.name
     keyVaultName: keyVault.outputs.name
     applicationInsightsName: monitoring.outputs.applicationInsightsName

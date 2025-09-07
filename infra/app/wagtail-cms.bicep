@@ -3,7 +3,7 @@ param location string = resourceGroup().location
 param tags object = {}
 
 param identityName string
-param containerAppsEnvironmentName string
+param appServicePlanName string
 param containerRegistryName string
 param keyVaultName string
 param applicationInsightsName string
@@ -19,8 +19,8 @@ resource identity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' 
   tags: tags
 }
 
-resource containerAppsEnvironment 'Microsoft.App/managedEnvironments@2023-05-01' existing = {
-  name: containerAppsEnvironmentName
+resource appServicePlan 'Microsoft.Web/serverfarms@2022-03-01' existing = {
+  name: appServicePlanName
 }
 
 resource containerRegistry 'Microsoft.ContainerRegistry/registries@2023-01-01-preview' existing = {
@@ -39,7 +39,7 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2022-05-01' existing 
   name: storageAccountName
 }
 
-// Grant the container app access to the container registry
+// Grant the app service access to the container registry
 resource acrPullRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   scope: containerRegistry
   name: guid(subscription().id, resourceGroup().id, identity.id, 'acrPullRole')
@@ -50,7 +50,7 @@ resource acrPullRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   }
 }
 
-// Grant the container app access to Key Vault
+// Grant the app service access to Key Vault
 resource keyVaultRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   scope: keyVault
   name: guid(subscription().id, resourceGroup().id, identity.id, 'keyVaultRole')
@@ -61,7 +61,7 @@ resource keyVaultRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   }
 }
 
-// Grant the container app access to Storage Account
+// Grant the app service access to Storage Account
 resource storageRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   scope: storageAccount
   name: guid(subscription().id, resourceGroup().id, identity.id, 'storageRole')
@@ -72,7 +72,7 @@ resource storageRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   }
 }
 
-resource app 'Microsoft.App/containerApps@2023-05-01' = {
+resource webApp 'Microsoft.Web/sites@2022-03-01' = {
   name: name
   location: location
   tags: union(tags, { 'azd-service-name': serviceName })
@@ -82,94 +82,73 @@ resource app 'Microsoft.App/containerApps@2023-05-01' = {
     userAssignedIdentities: { '${identity.id}': {} }
   }
   properties: {
-    managedEnvironmentId: containerAppsEnvironment.id
-    configuration: {
-      ingress: {
-        external: true
-        targetPort: 8000
-        transport: 'auto'
-        corsPolicy: {
-          allowedOrigins: ['*']
-          allowedMethods: ['*']
-          allowedHeaders: ['*']
-          allowCredentials: false
-        }
-      }
-      registries: [
+    serverFarmId: appServicePlan.id
+    siteConfig: {
+      linuxFxVersion: 'DOCKER|mcr.microsoft.com/azuredocs/aci-helloworld:latest'
+      alwaysOn: false  // Set to false for free tier
+      appSettings: [
         {
-          server: containerRegistry.properties.loginServer
-          identity: identity.id
-        }
-      ]
-      secrets: [
-        {
-          name: 'database-url'
-          keyVaultUrl: '${keyVault.properties.vaultUri}secrets/postgresql-connection-string'
-          identity: identity.id
+          name: 'DJANGO_SETTINGS_MODULE'
+          value: 'cms.settings.production'
         }
         {
-          name: 'django-secret-key'
+          name: 'DATABASE_URL'
+          value: '@Microsoft.KeyVault(VaultName=${keyVault.name};SecretName=postgresql-connection-string)'
+        }
+        {
+          name: 'SECRET_KEY'
           value: uniqueString(resourceGroup().id, name)
         }
         {
-          name: 'storage-account-key'
+          name: 'ALLOWED_HOSTS'
+          value: '*'
+        }
+        {
+          name: 'DEBUG'
+          value: 'False'
+        }
+        {
+          name: 'AZURE_STORAGE_ACCOUNT_NAME'
+          value: storageAccount.name
+        }
+        {
+          name: 'AZURE_STORAGE_ACCOUNT_KEY'
           value: storageAccount.listKeys().keys[0].value
         }
-      ]
-    }
-    template: {
-      containers: [
         {
-          image: 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
-          name: 'wagtail-cms'
-          env: [
-            {
-              name: 'DJANGO_SETTINGS_MODULE'
-              value: 'cms.settings.production'
-            }
-            {
-              name: 'DATABASE_URL'
-              secretRef: 'database-url'
-            }
-            {
-              name: 'SECRET_KEY'
-              secretRef: 'django-secret-key'
-            }
-            {
-              name: 'ALLOWED_HOSTS'
-              value: '*'
-            }
-            {
-              name: 'DEBUG'
-              value: 'False'
-            }
-            {
-              name: 'AZURE_STORAGE_ACCOUNT_NAME'
-              value: storageAccount.name
-            }
-            {
-              name: 'AZURE_STORAGE_ACCOUNT_KEY'
-              secretRef: 'storage-account-key'
-            }
-            {
-              name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
-              value: applicationInsights.properties.ConnectionString
-            }
-          ]
-          resources: {
-            cpu: json('0.5')
-            memory: '1.0Gi'
-          }
+          name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
+          value: applicationInsights.properties.ConnectionString
+        }
+        {
+          name: 'DOCKER_REGISTRY_SERVER_URL'
+          value: containerRegistry.properties.loginServer
+        }
+        {
+          name: 'DOCKER_REGISTRY_SERVER_USERNAME'
+          value: containerRegistry.listCredentials().username
+        }
+        {
+          name: 'DOCKER_REGISTRY_SERVER_PASSWORD'
+          value: containerRegistry.listCredentials().passwords[0].value
+        }
+        {
+          name: 'WEBSITES_ENABLE_APP_SERVICE_STORAGE'
+          value: 'false'
+        }
+        {
+          name: 'WEBSITES_PORT'
+          value: '8000'
         }
       ]
-      scale: {
-        minReplicas: 1
-        maxReplicas: 10
+      cors: {
+        allowedOrigins: ['*']
+        supportCredentials: false
       }
     }
+    httpsOnly: true
   }
 }
 
 output identityPrincipalId string = identity.properties.principalId
-output name string = app.name
-output uri string = 'https://${app.properties.configuration.ingress.fqdn}'
+output name string = webApp.name
+output uri string = 'https://${webApp.properties.defaultHostName}'

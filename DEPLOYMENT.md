@@ -1,6 +1,6 @@
-# Deploy Wagtail CMS to Azure Container Apps
+# Deploy Wagtail CMS to Azure App Service (Free/Low-Cost Tier)
 
-This guide will help you deploy your Wagtail CMS application to Azure using Azure Container Apps, PostgreSQL, and Blob Storage.
+This guide will help you deploy your Wagtail CMS application to Azure using Azure App Service with the lowest cost tiers, PostgreSQL, and Blob Storage.
 
 ## Prerequisites
 
@@ -13,12 +13,23 @@ This guide will help you deploy your Wagtail CMS application to Azure using Azur
 
 Your Wagtail application will be deployed with:
 
-- **Azure Container Apps**: Hosts the containerized Django/Wagtail application
-- **Azure Database for PostgreSQL**: Managed PostgreSQL database
-- **Azure Blob Storage**: Stores static files and media uploads
+- **Azure App Service (Free Tier)**: Hosts the containerized Django/Wagtail application
+- **Azure Database for PostgreSQL (Burstable Tier)**: Managed PostgreSQL database - lowest cost tier
+- **Azure Blob Storage (Standard LRS)**: Stores static files and media uploads - most cost-effective storage
 - **Azure Key Vault**: Securely stores database connection strings and secrets
-- **Azure Container Registry**: Stores your Docker images
+- **Azure Container Registry (Basic Tier)**: Stores your Docker images - lowest cost tier
 - **Application Insights**: Application monitoring and logging
+
+## Cost Breakdown (Estimated Monthly)
+
+- **App Service (F1 Free Tier)**: $0/month (limited to 60 minutes/day, 1GB storage)
+- **PostgreSQL (Burstable B1ms)**: ~$12-15/month
+- **Storage Account (Standard LRS)**: ~$1-3/month (depending on usage)
+- **Container Registry (Basic)**: ~$5/month (includes 10GB storage)
+- **Application Insights**: Free tier available (limited data retention)
+- **Key Vault**: ~$0.03/month for operations
+
+**Total estimated cost: ~$18-23/month**
 
 ## Step 1: Install Azure Developer CLI
 
@@ -60,8 +71,8 @@ azd up
 This command will:
 
 1. Build and push your Docker image to Azure Container Registry
-2. Provision all Azure resources (Container Apps, PostgreSQL, Storage, etc.)
-3. Deploy your application
+2. Provision all Azure resources (App Service, PostgreSQL, Storage, etc.)
+3. Deploy your application to App Service
 4. Run database migrations
 5. Set up all necessary configurations
 
@@ -69,11 +80,12 @@ This command will:
 
 After deployment, you'll need to create a superuser for the Wagtail admin:
 
-1. Get the container app name from the deployment output
-2. Use Azure CLI to run commands in the container:
+1. Get the app service name from the deployment output
+2. Use Azure CLI to run commands in the app service:
 
 ```bash
-az containerapp exec --name <your-container-app-name> --resource-group <your-resource-group> --command "/bin/bash"
+# Enable SSH access to the container
+az webapp ssh --name <your-app-service-name> --resource-group <your-resource-group>
 ```
 
 Then inside the container:
@@ -81,6 +93,8 @@ Then inside the container:
 ```bash
 python manage.py createsuperuser
 ```
+
+Alternatively, you can use the Azure portal's "Console" feature in your App Service.
 
 ## Step 6: Access Your Application
 
@@ -141,7 +155,7 @@ To use a custom domain:
 Your application includes:
 
 - **Application Insights**: Performance monitoring and error tracking
-- **Container Apps logs**: Application and system logs
+- **App Service logs**: Application and system logs
 - **PostgreSQL metrics**: Database performance monitoring
 
 Access monitoring through the Azure Portal or use `azd logs` for quick access.
@@ -152,7 +166,19 @@ Access monitoring through the Azure Portal or use `azd logs` for quick access.
 - Managed identity for secure access to Azure services
 - HTTPS enforcement
 - Security headers configured
-- Network security through Azure Container Apps environment
+- Network security through Azure App Service
+
+## Free Tier Limitations
+
+The Azure App Service Free tier has some limitations:
+
+- **60 minutes of compute time per day**: Your app will stop after 60 minutes of cumulative usage
+- **1GB storage**: Limited disk space for your application
+- **No custom domains**: You'll use the azurewebsites.net domain
+- **No SSL certificates**: HTTPS is available but only on the default domain
+- **No auto-scaling**: Fixed to 1 instance
+
+For production use, consider upgrading to a Basic (B1) tier (~$13/month) which removes these limitations.
 
 ## Troubleshooting
 
@@ -162,10 +188,10 @@ Access monitoring through the Azure Portal or use `azd logs` for quick access.
 azd logs
 ```
 
-### Access container shell
+### Access app service shell
 
 ```bash
-az containerapp exec --name <container-app-name> --resource-group <resource-group> --command "/bin/bash"
+az webapp ssh --name <app-service-name> --resource-group <resource-group>
 ```
 
 ### Check resource status
@@ -180,12 +206,31 @@ az resource list --resource-group <resource-group> --output table
 - Check Key Vault access policies
 - Verify managed identity permissions
 
+### Free tier timeout issues
+
+If your app stops due to the 60-minute daily limit:
+
+- Wait until the next day (resets at midnight UTC)
+- Consider upgrading to Basic tier for production
+- Monitor usage through Azure portal
+
 ## Cost Optimization
 
-- Container Apps uses consumption-based pricing
-- PostgreSQL uses Burstable tier for cost efficiency
-- Storage account uses Standard LRS for cost-effectiveness
-- Consider scaling down resources for development environments
+- App Service Free tier: $0/month (with limitations)
+- PostgreSQL Burstable tier: Lowest cost database option
+- Storage account Standard LRS: Most cost-effective storage
+- Consider pausing/stopping resources during development
+- Monitor usage to avoid unexpected charges
+
+## Upgrading from Free Tier
+
+To upgrade your App Service to remove limitations:
+
+```bash
+az appservice plan update --name <app-service-plan-name> --resource-group <resource-group> --sku B1
+```
+
+This will cost approximately $13/month but removes the 60-minute limit and adds more features.
 
 ## Next Steps
 

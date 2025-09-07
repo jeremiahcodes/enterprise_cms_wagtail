@@ -7,7 +7,7 @@ services:
   wagtail-cms:
     project: ./cms/enterprise-cms
     language: python
-    host: containerapp
+    host: appservice
     docker:
       path: ./Dockerfile
       context: ./
