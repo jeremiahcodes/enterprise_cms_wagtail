@@ -73,12 +73,14 @@ if AZURE_ACCOUNT_NAME and AZURE_ACCOUNT_KEY:
             "account_key": AZURE_ACCOUNT_KEY,
             "overwrite_files": True,
             "azure_ssl": True,
+            "expiration_secs": 3600,  # URLs expire after 1 hour
+            "custom_domain": None,  # Don't use custom domain for private storage
         },
     }
     
     # Media files configuration with Azure Blob Storage (private)
     AZURE_MEDIA_CONTAINER = 'media'
-    # Serve media files through Django instead of direct Azure URLs
+    # Serve media files through Django instead of direct Azure URLs for private storage
     MEDIA_URL = '/media/'
     
     # Custom storage class for private Azure media files
