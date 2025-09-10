@@ -44,18 +44,24 @@ resource acrPullRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   scope: containerRegistry
   name: guid(subscription().id, resourceGroup().id, identity.id, 'acrPullRole')
   properties: {
-    roleDefinitionId:  subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '7f951dda-4ed3-4680-a7ca-43fe172d538d')
+    roleDefinitionId: subscriptionResourceId(
+      'Microsoft.Authorization/roleDefinitions',
+      '7f951dda-4ed3-4680-a7ca-43fe172d538d'
+    )
     principalType: 'ServicePrincipal'
     principalId: identity.properties.principalId
   }
 }
 
-// Grant the app service access to Key Vault
+// Grant the user-assigned managed identity access to Key Vault
 resource keyVaultRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   scope: keyVault
   name: guid(subscription().id, resourceGroup().id, identity.id, 'keyVaultRole')
   properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '4633458b-17de-408a-b874-0445c86b69e6')
+    roleDefinitionId: subscriptionResourceId(
+      'Microsoft.Authorization/roleDefinitions',
+      '4633458b-17de-408a-b874-0445c86b69e6'
+    )
     principalType: 'ServicePrincipal'
     principalId: identity.properties.principalId
   }
@@ -66,9 +72,26 @@ resource storageRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   scope: storageAccount
   name: guid(subscription().id, resourceGroup().id, identity.id, 'storageRole')
   properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'b7e6dc6d-f1e8-4753-8033-0f276bb0955b')
+    roleDefinitionId: subscriptionResourceId(
+      'Microsoft.Authorization/roleDefinitions',
+      'b7e6dc6d-f1e8-4753-8033-0f276bb0955b'
+    )
     principalType: 'ServicePrincipal'
     principalId: identity.properties.principalId
+  }
+}
+
+// Grant the system-assigned managed identity access to Key Vault
+resource keyVaultRoleSystemAssigned 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  scope: keyVault
+  name: guid(subscription().id, resourceGroup().id, webApp.id, 'keyVaultRoleSystemAssigned')
+  properties: {
+    roleDefinitionId: subscriptionResourceId(
+      'Microsoft.Authorization/roleDefinitions',
+      '4633458b-17de-408a-b874-0445c86b69e6'
+    )
+    principalType: 'ServicePrincipal'
+    principalId: webApp.identity.principalId
   }
 }
 
@@ -76,16 +99,16 @@ resource webApp 'Microsoft.Web/sites@2022-03-01' = {
   name: name
   location: location
   tags: union(tags, { 'azd-service-name': serviceName })
-  dependsOn: [ acrPullRole, keyVaultRole, storageRole ]
+  dependsOn: [acrPullRole, keyVaultRole, storageRole]
   identity: {
-    type: 'UserAssigned'
+    type: 'SystemAssigned, UserAssigned'
     userAssignedIdentities: { '${identity.id}': {} }
   }
   properties: {
     serverFarmId: appServicePlan.id
     siteConfig: {
       linuxFxVersion: 'DOCKER|${containerRegistry.properties.loginServer}/wagtail-cms:latest'
-      alwaysOn: false  // Set to false for free tier
+      alwaysOn: false // Set to false for free tier
       appSettings: [
         {
           name: 'DJANGO_SETTINGS_MODULE'
@@ -93,7 +116,23 @@ resource webApp 'Microsoft.Web/sites@2022-03-01' = {
         }
         {
           name: 'DATABASE_URL'
-          value: '@Microsoft.KeyVault(VaultName=${keyVault.name};SecretName=postgresql-connection-string)'
+          value: '@Microsoft.KeyVault(SecretUri=${keyVault.properties.vaultUri}secrets/postgresql-connection-string)'
+        }
+        {
+          name: 'DB_HOST'
+          value: '@Microsoft.KeyVault(SecretUri=${keyVault.properties.vaultUri}secrets/postgresql-host)'
+        }
+        {
+          name: 'DB_NAME'
+          value: postgresqlDatabaseName
+        }
+        {
+          name: 'DB_USER'
+          value: '@Microsoft.KeyVault(SecretUri=${keyVault.properties.vaultUri}secrets/postgresql-user)'
+        }
+        {
+          name: 'DB_PASSWORD'
+          value: '@Microsoft.KeyVault(SecretUri=${keyVault.properties.vaultUri}secrets/postgresql-admin-password)'
         }
         {
           name: 'SECRET_KEY'

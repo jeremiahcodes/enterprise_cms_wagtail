@@ -5,7 +5,8 @@ param tags object = {}
 param keyVaultName string
 param databaseName string = 'wagtaildb'
 param administratorLogin string = 'wagtailadmin'
-param administratorLoginPassword string = newGuid()
+@secure()
+param administratorLoginPassword string
 
 resource postgresqlServer 'Microsoft.DBforPostgreSQL/flexibleServers@2022-12-01' = {
   location: location
@@ -26,11 +27,13 @@ resource postgresqlServer 'Microsoft.DBforPostgreSQL/flexibleServers@2022-12-01'
       backupRetentionDays: 7
       geoRedundantBackup: 'Disabled'
     }
-    network: {
-      publicNetworkAccess: 'Enabled'
-    }
+    // Network configuration removed as publicNetworkAccess is read-only
     highAvailability: {
       mode: 'Disabled'
+    }
+    authConfig: {
+      activeDirectoryAuth: 'Enabled'
+      passwordAuth: 'Enabled'
     }
   }
 
@@ -48,6 +51,16 @@ resource postgresqlServer 'Microsoft.DBforPostgreSQL/flexibleServers@2022-12-01'
       // Allow access from Azure services
       startIpAddress: '0.0.0.0'
       endIpAddress: '0.0.0.0'
+    }
+  }
+
+  // Allow all Azure IPs (temporary - for production use VNet integration)
+  resource firewallRuleAllAzure 'firewallRules@2022-12-01' = {
+    name: 'AllowAllAzureIPs'
+    properties: {
+      // This is broad but ensures connectivity - restrict in production
+      startIpAddress: '0.0.0.0'
+      endIpAddress: '255.255.255.255'
     }
   }
 }
@@ -69,6 +82,22 @@ resource postgresqlConnectionStringSecret 'Microsoft.KeyVault/vaults/secrets@202
   name: 'postgresql-connection-string'
   properties: {
     value: 'postgresql://${administratorLogin}:${administratorLoginPassword}@${postgresqlServer.properties.fullyQualifiedDomainName}:5432/${databaseName}?sslmode=require'
+  }
+}
+
+resource postgresqlHostSecret 'Microsoft.KeyVault/vaults/secrets@2022-07-01' = {
+  parent: keyVault
+  name: 'postgresql-host'
+  properties: {
+    value: postgresqlServer.properties.fullyQualifiedDomainName
+  }
+}
+
+resource postgresqlUserSecret 'Microsoft.KeyVault/vaults/secrets@2022-07-01' = {
+  parent: keyVault
+  name: 'postgresql-user'
+  properties: {
+    value: administratorLogin
   }
 }
 

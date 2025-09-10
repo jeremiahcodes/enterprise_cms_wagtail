@@ -3,7 +3,7 @@ param location string = resourceGroup().location
 param tags object = {}
 
 param sku object = {
-  name: 'F1'
+  name: 'B1'
   tier: 'Free'
 }
 

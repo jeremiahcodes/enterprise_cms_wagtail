@@ -69,6 +69,7 @@ module database './core/database/postgresql.bicep' = {
     tags: tags
     keyVaultName: keyVault.outputs.name
     databaseName: 'wagtaildb'
+    administratorLoginPassword: uniqueString(subscription().id, rg.id, 'postgresql')
   }
 }
 
@@ -90,8 +91,8 @@ module appServicePlan './core/host/appserviceplan.bicep' = {
     location: location
     tags: tags
     sku: {
-      name: 'F1'  // Free tier
-      tier: 'Free'
+      name: 'B1' // Basic tier
+      tier: 'Basic'
     }
   }
 }

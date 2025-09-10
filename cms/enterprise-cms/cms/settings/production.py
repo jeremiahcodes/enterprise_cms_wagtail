@@ -31,22 +31,112 @@ CSRF_TRUSTED_ORIGINS = [
 
 # Database configuration for PostgreSQL
 DATABASE_URL = os.environ.get('DATABASE_URL')
-if DATABASE_URL:
-    DATABASES = {
-        'default': dj_database_url.parse(
-            DATABASE_URL,
-            conn_max_age=600,
-            conn_health_checks=True
-        )
-    }
-else:
-    # Fallback to SQLite for now to get the app running
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': '/tmp/db.sqlite3',
+print(f"DEBUG: DATABASE_URL = '{DATABASE_URL}' (length: {len(DATABASE_URL) if DATABASE_URL else 0})")
+
+# Also try individual database environment variables as fallback
+DB_HOST = os.environ.get('DB_HOST')
+DB_NAME = os.environ.get('DB_NAME')
+DB_USER = os.environ.get('DB_USER')
+DB_PASSWORD = os.environ.get('DB_PASSWORD')
+
+print(f"DEBUG: Individual DB vars - HOST: {DB_HOST}, NAME: {DB_NAME}, USER: {DB_USER}, PASSWORD: {'***' if DB_PASSWORD else None}")
+
+# Check if DATABASE_URL is properly formatted (not a KeyVault reference)
+if DATABASE_URL and DATABASE_URL.strip() and DATABASE_URL.startswith(('postgresql://', 'postgres://')):
+    try:
+        DATABASES = {
+            'default': dj_database_url.parse(
+                DATABASE_URL,
+                conn_max_age=600,
+                conn_health_checks=True,
+                ssl_require=True
+            )
         }
-    }
+        # Ensure SSL is enabled for Azure PostgreSQL
+        DATABASES['default']['OPTIONS'] = {
+            'sslmode': 'require',
+        }
+        print("DEBUG: Using PostgreSQL database from DATABASE_URL")
+    except Exception as e:
+        print(f"ERROR: Failed to parse DATABASE_URL: {e}")
+        # Fallback to individual environment variables
+        if all([DB_HOST, DB_NAME, DB_USER, DB_PASSWORD]):
+            DATABASES = {
+                'default': {
+                    'ENGINE': 'django.db.backends.postgresql',
+                    'NAME': DB_NAME,
+                    'USER': DB_USER,
+                    'PASSWORD': DB_PASSWORD,
+                    'HOST': DB_HOST,
+                    'PORT': '5432',
+                    'OPTIONS': {
+                        'sslmode': 'require',
+                    },
+                }
+            }
+            print("DEBUG: Using PostgreSQL database from individual environment variables")
+        else:
+            # Final fallback to SQLite
+            DATABASES = {
+                'default': {
+                    'ENGINE': 'django.db.backends.sqlite3',
+                    'NAME': '/tmp/db.sqlite3',
+                }
+            }
+            print("DEBUG: Fell back to SQLite due to DATABASE_URL parse error and missing individual vars")
+elif DATABASE_URL and ('KeyVault' in str(DATABASE_URL) or DATABASE_URL.startswith('@Microsoft')):
+    print(f"WARNING: DATABASE_URL appears to be an unresolved KeyVault reference: {DATABASE_URL}")
+    # Try individual environment variables as fallback
+    if all([DB_HOST, DB_NAME, DB_USER, DB_PASSWORD]):
+        DATABASES = {
+            'default': {
+                'ENGINE': 'django.db.backends.postgresql',
+                'NAME': DB_NAME,
+                'USER': DB_USER,
+                'PASSWORD': DB_PASSWORD,
+                'HOST': DB_HOST,
+                'PORT': '5432',
+                'OPTIONS': {
+                    'sslmode': 'require',
+                },
+            }
+        }
+        print("DEBUG: Using PostgreSQL database from individual environment variables (KeyVault fallback)")
+    else:
+        # Fallback to SQLite when KeyVault reference is not resolved
+        DATABASES = {
+            'default': {
+                'ENGINE': 'django.db.backends.sqlite3',
+                'NAME': '/tmp/db.sqlite3',
+            }
+        }
+        print("DEBUG: Using SQLite due to unresolved KeyVault reference")
+else:
+    # Try individual environment variables first
+    if all([DB_HOST, DB_NAME, DB_USER, DB_PASSWORD]):
+        DATABASES = {
+            'default': {
+                'ENGINE': 'django.db.backends.postgresql',
+                'NAME': DB_NAME,
+                'USER': DB_USER,
+                'PASSWORD': DB_PASSWORD,
+                'HOST': DB_HOST,
+                'PORT': '5432',
+                'OPTIONS': {
+                    'sslmode': 'require',
+                },
+            }
+        }
+        print("DEBUG: Using PostgreSQL database from individual environment variables")
+    else:
+        # Final fallback to SQLite
+        DATABASES = {
+            'default': {
+                'ENGINE': 'django.db.backends.sqlite3',
+                'NAME': '/tmp/db.sqlite3',
+            }
+        }
+        print("DEBUG: Using SQLite (no valid DATABASE_URL or individual vars found)")
 
 # Azure Blob Storage configuration
 AZURE_ACCOUNT_NAME = os.environ.get('AZURE_STORAGE_ACCOUNT_NAME')
